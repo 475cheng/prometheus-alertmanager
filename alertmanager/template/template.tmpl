@@ -1,0 +1,24 @@
+{{ define "email.default.subject" }}
+	[错误订阅信息]{{ len .Alerts }}条 ({{.GroupLabels.service}}) 时间
+	{{ range $i, $alert := .Alerts }}
+        {{if eq $i 0}} 
+			{{ $alert.StartsAt }}
+		{{ end }}
+    {{ end }}
+{{ end }}
+{{ define "email.default.html" }}
+	<span style="font-size:18px;font-weight: 600;" >报警数量:</span><span style="font-size:15px;"> {{ len .Alerts }}</span><br/>
+	<span style="font-size:18px;font-weight: 600;" >标题:</span><span style="font-size:15px;"> {{.GroupLabels.title}}</span><br/>
+	<br/>
+	{{ range $i, $alert := .Alerts }}
+	<span style="font-size:18px;font-weight: 600;" >错误信息:  </span><span style="font-size:15px;">{{ $alert.Annotations.errormessage }}</span><br/>
+	<span style="font-size:18px;font-weight: 600;" >请求参数: </span><span style="font-size:15px;">{{ $alert.Annotations.requestparam }}</span><br/>
+	<span style="font-size:18px;font-weight: 600;" >请求地址:  </span><span style="font-size:15px;">{{ $alert.Annotations.requesturl }}</span><br/>
+	<span style="font-size:18px;font-weight: 600;" >服务端口:  </span><span style="font-size:15px;">{{ $alert.Annotations.serverport }}</span><br/>
+	<span style="font-size:18px;font-weight: 600;" >服务器ip:  </span><span style="font-size:15px;">{{ $alert.Annotations.serverip }}</span><br/>
+	<span style="font-size:18px;font-weight: 600;" >客户ip:  </span><span style="font-size:15px;">{{ $alert.Annotations.clientip }}</span><br/>
+	<span style="font-size:18px;font-weight: 600;" >异常栈信息:  </span><span style="font-size:15px;">{{ $alert.Annotations.stacktrace }}</span><br/>
+	<br/>
+	{{ end }}
+
+{{ end }}
