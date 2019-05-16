@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 1m
+scrape_configs:
+  - job_name: chejia
+    metrics_path: '/japi/chejia/prometheus'
+    static_configs:
+      - targets: ['172.20.12.15:20003']
+        labels:
+          alertname: c2
+  - job_name: carloan
+    metrics_path: '/japi/chejia/prometheus'
+    static_configs:
+      - targets: ['172.20.12.14:20003']
+        labels:
+          alertname: c1

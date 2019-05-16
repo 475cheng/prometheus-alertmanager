@@ -1,0 +1,113 @@
+1.下载alertManager组件 https://prometheus.io/download/  解压tar包即可
+2.发送邮件配置如下： alert.yml
+global:
+  smtp_smarthost: 'smtp.163.com:25' 		#163服务器
+  smtp_from: 'm176147512@163.com' 　		#发邮件的邮箱
+  smtp_auth_username: 'm176147512@163.com'#发邮件的邮箱用户名，也就是你的邮箱
+  smtp_auth_password: '123456'				#邮箱的授权密码 (如果是163邮箱，需要在设置->常规设置->点击左侧的客户端授权密码->开启授权密码)
+  
+templates: 									
+- '/etc/alertmanager/template/*.tmpl'		#加载所有消息通知模板
+
+route:
+  receiver: 'default-receiver'
+  group_by: ['alertname','cluster']			#将传入警报分组在一起的标签。例如，cluster=A和alertname=LatencyHigh的多个警报将批处理为单个组。
+  group_wait：30s				#当传入的警报创建新的警报组时，至少等待"30s"发送初始通知。
+  group_interval：5m			#当发送第一个通知时，等待"5m"发送一批新的警报，这些警报开始针对该组触发。 （如果是group_by里的内容为新的如：alertname=1,alertname=2 会马上发送2封邮件, 如果是group_by之外的会等待5m触发一次）
+  repeat_interval: 4h 			#如果警报已成功发送，请等待"4h"重新发送，重复发送邮件的时间间隔
+  routes:						#所有与下列子路由不匹配的警报将保留在根节点，并被分派到'default-receiver'。
+  - receiver: 'database-pager'
+    group_wait: 10s
+    match_re:
+      service: mysql|cassandra	#带有service=mysql或service=cassandra的所有警报都被发送到'database-pager'
+  - receiver: 'frontend-pager'
+    group_by: [product, environment]
+    match:
+      team: frontend			#team=frontend的 和
+  
+receivers:
+- name: default-receiver				#不同的报警 发送给不同的邮箱
+  email_configs:
+  - to: 'd213312@qq.com,44646@qq.com				#收邮件的邮箱 多个邮箱用,隔开
+	html: '{{ template "default.html" . }}'     #应用哪个模板
+    headers: { Subject: "[WARN] 报警邮件default" }   #邮件头信息
+- name: database-pager
+  email_configs:
+  - to: '2312123@qq.com'
+	html: '{{ template "database.html" . }}'     #应用哪个模板
+    headers: { Subject: "[INFO] 报警邮件test" }   #邮件头信息
+
+3.在安装目录中启动程序：./alertmanager -config.file=alert.yml 
+4.可以发送post请求触发报警机制：
+	localhost:9093/api/v1/alerts
+	[{
+  "labels": {
+     "alertname": "alertname",
+     "severity": "warning"
+   },
+   "annotations": {
+      "description": "Instance play-app:9000 under lower load",
+      "summary": "play-app:9000 of job playframework-app is under lower load"
+    }
+ }]
+
+5.模板用的是go模板系统的语法，模板接收的Data
+	Receiver			String	通知将被发送到的接收者名称
+	Status				String  报警状态 firing|resolved
+	Alerts				Alert   警报对象列表
+	GroupLabels			KV 		警报的标签分组
+	CommonLabels		KV		警报共有的标签
+	CommonAnnotations	KV		警报的常用注释
+	ExternalURL			String	链接到发送通知的Alertmanager
+	
+	Alert:
+	Status				String  定义警报是否已解决
+	Labels				KV		警报的一组标签
+	Annotations			KV		警报的一组注释
+	StartsAt			time	开始时间
+	EndsAt				time	结束时间
+	GeneratorURL		String	一个反向链接，用于标识此警报的生成实体
+
+6.有关消息模板设置步骤如下：
+	1).加载所有消息模板
+		templates:						
+		- 'D:\alertmanager-0.15.3.windows-amd64\template\*.tmpl'
+	2).消息模板alertemp.tmpl内容:			
+		{{ define "email.default.subject" }}	#邮件主题模板
+			[错误订阅信息]{{ len .Alerts }}条 ({{.GroupLabels.appid}}-{{.GroupLabels.service}}) 时间
+			{{ range $i, $alert := .Alerts }}
+				{{if eq $i 0}} 
+					{{ $alert.StartsAt }}
+				{{ end }}
+			{{ end }}
+		{{ end }}
+
+		 {{ define "alertemp.html" }}	#邮件内容模板   alertemp.html为模板名称
+		<table>							#模板内容 格式为html
+			<tr><td>报警名称</td><td>开始时间</td></tr>
+			{{ range $i, $alert := .Alerts }}		#遍历Alerts
+				<tr><td>{{ $alert.Labels.alertname }}</td><td>{{ $alert.StartsAt }}</td></tr>	#取值时Labels,StartsAt等严格按照 官方文档定义字段取值 否则取不到
+				<span style="font-size:18px;font-weight: 600;" >错误信息:  </span><span style="font-size:15px;">{{ $alert.Annotations.errormessage }}</span><br/>
+			{{ end }}
+		</table>
+		{{ end }}
+		
+	3).指定每个邮箱使用哪个模板
+		receivers:
+		- name: default-receiver
+		  email_configs:
+		  - to: '3214534@qq.com'				#收邮件的邮箱
+			html: '{{ template "alertemp.html" . }}'     #应用哪个模板
+			headers: { Subject: "[WARN] 报警邮件alertemp" }   #邮件主题信息 如果不写headers也可以在模板中定义默认加载email.default.subject这个模板
+			
+7.alertmanager热加载  post请求 localhost:9093/-/reload 即可
+	
+8.性能压测
+遍历10w的请求量，10个线程并发访问，发送完邮件 内存增加约300M，即300M内存未释放
+遍历100w的请求量，10个线程并发访问，发送完邮件 内存增加约1.5G，即1.5G内存未释放
+
+		
+功能总结：
+1.不同报警发送不同的邮箱，每个邮箱的模板都可以自定义
+2.appId，service，title 都相同的报警信息，一定时间内汇总到一封邮件内
+3.alertmanager热加载  post请求 localhost:9093/-/reload

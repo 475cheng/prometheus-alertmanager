@@ -1,0 +1,72 @@
+1.prometheus安装运行（windows为例）：
+	下载压缩包解压即可：https://prometheus.io/download/
+	运行命令：prometheus --config.file="D://prometheus.yml" 
+	访问地址：http://localhost:9090
+	重新加载配置：启动命令后面加 --web.enable-lifecycle
+2.prometheus配置项说明：
+global:
+  
+  scrape_interval: <duration> | default = 1m # 拉取 targets 的默认时间间隔
+  scrape_timeout: <duration> | default = 10s # 拉取一个 target 的超时时间。
+  
+  evaluation_interval: <duration> | default = 1m # 触发rule间隔
+  external_labels: [ <labelname>: <labelvalue> ... ] #额外的属性，会添加到拉取的数据并存到数据库中。
+
+rule_files:	#加载规则文件（记录规则和警报规则）
+  [ - <filepath_glob> ... ]
+
+scrape_configs: #主要用于配置拉取数据节点，每一个拉取配置主要包含以下参数
+  [ - <scrape_config> ... ]
+
+alerting:		#指定的alertmanager相关报警设置。
+  alert_relabel_configs:	#动态修改 alert 属性的规则配置。
+    [ - <relabel_config> ... ]
+  alertmanagers:			#用于动态发现 Alertmanager 的配置。
+    [ - <alertmanager_config> ... ]
+
+remote_write:	#设置相关的远程写特征。
+  [ - <remote_write> ... ]
+
+remote_read:	#设置相关的远程读特征。
+  [ - <remote_read> ... ]
+
+规则文件：
+groups:
+  - name: <string> #名称全局唯一
+    interval：<duration> | default = global.evaluation_interval  #默认等于prometheus.yml中evaluation_interval
+	rules：
+	- alert: <string> 					#报警名称
+	  expr: <string>					#匹配规则
+	  labels:[ <labelname>: <labelvalue> ]	#添加或覆盖的标签。
+
+检测点配置：
+scrape_config
+ -job_name: <job_name>  #任务名称。
+  honor_labels: <boolean> | default = false  #用于解决拉取数据标签有冲突，当设置为 true, 以拉取数据为准，否则以服务配置为准
+  params: [ <string>: [<string>, ...] ]		 #数据拉取访问时带的请求参数
+  scrape_interval: <duration> | default = 1m # 拉取时间间隔
+  scrape_timeout: <duration> | default = 10s # 拉取超时时间
+  metrics_path：<path> | default = /metrics  # 拉取节点的 metric 路径
+  static_configs：						#目标列表和公共的标签集
+	- targets: ['172.20.12.6:8888']
+	  labels: [ <labelname>: <labelvalue> ... ]
+
+3.prometheus数据查询 DSL 语言：PromQL
+	1).按照标签中的instance分组，求接口请求总数
+	DSL：sum (http_response_time_milliseconds_count) by (instance)
+	参数含义：
+	sum:聚合运算符 还有（min ，max ，avg  等等）
+	http_response_time_milliseconds_count：指标名称
+
+	2).求接口平均耗时
+	DSL：rate(rpc_invoke_time_h_sum{job="Center"}[1m]) / rate(rpc_invoke_time_h_count{job="Center"}[1m])
+	参数含义:
+	job:表示prometheus的配置文件中job_name的名称
+	rpc_invoke_time_h_sum：指标名称
+
+4.grafana 模板变量 
+	Query Options
+		Query:query_result( sum(http_response_time_milliseconds_count) by(status) )
+		Regex: /"([^"]+)"/
+	当选中多个时 用=不能查询出来  要用=~
+	sum (http_response_time_milliseconds_count{status=~"$status"}) by (status)

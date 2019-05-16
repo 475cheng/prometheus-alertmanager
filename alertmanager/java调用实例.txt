@@ -1,0 +1,27 @@
+java工具类调用alertmanager
+	1).引入alertmanager的jar包
+	<dependency>
+			<groupId>com.bitauto.ep.fx</groupId>
+			<artifactId>alertmanager</artifactId>
+			<version>1.0.0.RELEASE</version>
+	</dependency>
+	
+	2).需要添加的配置如下：
+		##alertmanager地址
+		alertmanager.postUrl=http://172.20.12.7:9093/api/v1/alerts
+		##项目名称
+		alertmanager.appId=chejia
+		##服务名称
+		alertmanager.service=java/c#等等
+	3).调用实例：
+		@Autowired
+		private AlertClient alertClient;
+	
+		String s = alertClient.sendAlert("requestparam", "title", "errormessage", e, ClientMessageInter);
+		
+		说明：
+		requestparam:请求接口的参数，实体转换成JSONString
+		title：错误标题
+		errormessage：错误描述
+		e:代表捕获的异常类，用于打印错误栈信息
+		ClientMessageInter: 实现这个接口的实现类 一般传new HttpClientMessage()，也可以自己实现

@@ -1,0 +1,137 @@
+springboot集成prometheus
+	1.pom.xml
+	<!-- Exposition spring_boot -->
+        <dependency>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient_spring_boot</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <!-- Hotspot JVM metrics -->
+        <dependency>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient_hotspot</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <!-- Exposition servlet -->
+        <dependency>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient_servlet</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+	2.如果想记录接口请求次数，响应情况，在拦截器中添加处理类
+```接口请求次数处理类
+package com.bitauto.ep.fx.webapi.configuration.handler;
+
+import io.prometheus.client.Counter;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.handler.HandlerInterceptorAdapter;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.lang.reflect.Method;
+import java.util.Random;
+
+public class RequestCounterInterceptor extends HandlerInterceptorAdapter {
+
+    private static final Counter requestTotal = Counter.build()
+            .name("http_requests_total")
+            .labelNames("service","method", "handler", "status")
+            .help("Http Request Total").register();
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception e)
+            throws Exception {
+        String handlerLabel = handler.toString();
+        if (handler instanceof HandlerMethod) {
+            Method method = ((HandlerMethod) handler).getMethod();
+            handlerLabel = method.getDeclaringClass().getSimpleName() + "." + method.getName();
+        }
+        String method = request.getMethod();
+        int status = response.getStatus();
+        double random =Math.random()*10;
+        int a=(int)random;
+        if( (a %2)==0){
+            status=300;
+        }
+        requestTotal.labels("chejia",method, handlerLabel, Integer.toString(status)).inc();
+    }
+}
+```
+
+```接口响应情况处理类
+package com.bitauto.ep.fx.webapi.configuration.handler;
+
+import java.lang.reflect.Method;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import io.prometheus.client.Summary;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.handler.HandlerInterceptorAdapter;
+
+public class RequestTimingInterceptor extends HandlerInterceptorAdapter {
+
+    private static final String REQ_PARAM_TIMING = "timing";
+
+    private static final Summary responseTimeInMs = Summary
+            .build()
+            .name("http_response_time_milliseconds")
+            .labelNames("method", "handler", "status")
+            .help("Request completed time in milliseconds")
+            .register();
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        request.setAttribute(REQ_PARAM_TIMING, System.currentTimeMillis());
+        return true;
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex)throws Exception {
+        Long timingAttr = (Long) request.getAttribute(REQ_PARAM_TIMING);
+        long completedTime = System.currentTimeMillis() - timingAttr;
+        String handlerLabel = handler.toString();
+        if (handler instanceof HandlerMethod) {
+            Method method = ((HandlerMethod) handler).getMethod();
+            handlerLabel = method.getDeclaringClass().getSimpleName() + "." + method.getName();
+        }
+        int status = response.getStatus();
+        double random =Math.random()*10;
+        int a=(int)random;
+        if( (a %2)==0){
+            status=300;
+        }
+        responseTimeInMs.labels(request.getMethod(), handlerLabel,
+                Integer.toString(status)).observe(completedTime);
+    }
+}
+```
+
+	3.一个配置类MonitoringConfig  
+```
+@Configuration
+public class MonitoringConfig{
+    @Bean
+    SpringBootMetricsCollector springBootMetricsCollector(Collection<PublicMetrics> publicMetrics) {
+
+        SpringBootMetricsCollector springBootMetricsCollector = new SpringBootMetricsCollector(publicMetrics);
+        springBootMetricsCollector.register();
+        return springBootMetricsCollector;
+    }
+
+    @Bean
+    ServletRegistrationBean servletRegistrationBean() {
+        DefaultExports.initialize();
+        return new ServletRegistrationBean(new MetricsServlet(), "/prometheus");
+    }
+}
+```  
+
+	4.在启动类上添加注解
+@EnablePrometheusEndpoint
+@EnableSpringBootMetricsCollector
+public class Application {
+
+	public static void main(String[] args) {
+		SpringApplication.run(Application.class, args);
+	}
+}

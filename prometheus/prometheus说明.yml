@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 15s# 拉取时间间隔
+  scrape_timeout: 10s # 拉取超时时间
+  evaluation_interval: 1m  # 触发rule间隔,default =1m
+scrape_configs:
+  - job_name: test
+    honor_labels: true          #用于解决拉取数据标签有冲突，当设置为 true, 以拉取数据为准，否则以服务配置为准
+    metrics_path: '/prometheus' #拉取数据路径
+    static_configs:
+      - targets: ['172.20.12.12:8888']   #抓取任务的 HTTP 地址
+        labels:
+          alertname: example
+alerting:
+  alertmanagers:    #用于动态发现 Alertmanager 的配置。
+  - static_configs: #alertmanager的地址
+    - targets: ['172.20.12.12:9093']
+
+rule_files:     #加载警报规则文件
+   - rule.yml

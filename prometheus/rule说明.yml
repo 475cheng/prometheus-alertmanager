@@ -1,0 +1,11 @@
+groups:
+- name: example
+  interval: 1m  #默认等于prometheus.yml中evaluation_interval
+  rules:
+  - alert: HighErrorRate    #alertname的值
+    expr: sum (http_response_time_milliseconds_count) by (instance) > 1     #报警规则
+    for: 5s         #等待5s发送到alertmanager
+    labels:         #额外添加的labels
+      severity: page
+    annotations:    #额外添加注释
+      summary: High request latency
